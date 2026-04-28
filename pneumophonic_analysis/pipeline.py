@@ -187,7 +187,7 @@ class PneumophonicPipeline:
             'glide': GlideAnalyzer(self.config),
         }
         
-        logger.info(f"Pipeline initialisé")
+        logger.info(f"Pipeline initialized with configuration:")
         logger.info(f"  Data root: {self.config.data_root}")
         logger.info(f"  Output root: {self.config.output_root}")
     

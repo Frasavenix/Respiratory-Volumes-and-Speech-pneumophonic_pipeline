@@ -19,11 +19,11 @@ SCRIPTS_DIR  = PROJECT_ROOT / "scripts"
 
 # ---- Available modes ----
 MODES = {
-    '1': ('Extract paired features (SINGLE subject) -> gen .h5 data files' ,       'test_paired.py'),
-    '2': ('Extract paired features (BATCH subject) -> gen .h5 data files',         'batch_extract.py'),
-    '3': ('Explore paired data (interactive plots)',        'plot_paired_features.py'),
-    '4': ('Batch generate PDF plots',                       'batch_plot_paired.py'),
-    '5': ('Run M2 correlation analysis',                    'm2_correlation.py'),
+    '1': ('Extract paired features (SINGLE ) -> gen .h5 data files' ,       'test_paired.py'),
+    '2': ('Extract paired features (BATCH ) -> gen .h5 data files',         'batch_extract.py'),
+    '3': ('Plot paired features and Save (SINGLE) -> gen PDFs + open plot tabs',        'plot_paired_features.py'),
+    '4': ('Plot paired features and Save (BATCH) !-LONG-!',  'batch_plot_paired.py'),
+    '5': ('M2 correlation analysis',  'm2_correlation.py'),
     '6': ('Diagnostic tools (OEP headers, sync, inventory)','tools.py'),
     '7': ('Run legacy acoustic analysis (Zocco pipeline)',  None),
 }
