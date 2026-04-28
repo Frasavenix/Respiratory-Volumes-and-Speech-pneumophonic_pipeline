@@ -28,6 +28,9 @@ tqdm>=4.62.0
 # Saving intermediate results
 h5py>=3.6.0
 
+# Correlation analysis plots
+seaborn>=0.11.0
+
 # Optional: for interactive notebooks
 # ipywidgets>=7.6.0
 # jupyter>=1.0.0

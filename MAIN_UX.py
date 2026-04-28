@@ -19,9 +19,9 @@ SCRIPTS_DIR  = PROJECT_ROOT / "scripts"
 
 # ---- Available modes ----
 MODES = {
-    '1': ('Extract paired features (single subject)',       'test_paired.py'),
-    '2': ('Batch extract all subjects',                     'batch_extract.py'),
-    '3': ('Explore paired data (interactive plots)',        'explore_paired.py'),
+    '1': ('Extract paired features (SINGLE subject) -> gen .h5 data files' ,       'test_paired.py'),
+    '2': ('Extract paired features (BATCH subject) -> gen .h5 data files',         'batch_extract.py'),
+    '3': ('Explore paired data (interactive plots)',        'plot_paired_features.py'),
     '4': ('Batch generate PDF plots',                       'batch_plot_paired.py'),
     '5': ('Run M2 correlation analysis',                    'm2_correlation.py'),
     '6': ('Diagnostic tools (OEP headers, sync, inventory)','tools.py'),
@@ -78,11 +78,12 @@ def main():
     print("  PNEUMOPHONIC PIPELINE")
     print("=" * 50)
 
-    for key, (desc, _) in MODES.items():
-        print(f"  [{key}] {desc}")
-    print(f"  [q] Quit")
+
 
     while True:
+        for key, (desc, _) in MODES.items():
+            print(f"  [{key}] {desc}")
+        print(f"  [q] Quit")
         choice = input("\nSelect mode: ").strip().lower()
 
         if choice == 'q':

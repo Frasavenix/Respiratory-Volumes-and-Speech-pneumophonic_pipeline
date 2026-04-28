@@ -19,40 +19,7 @@ Main modules
 - visualization: Visualization of signals and results
 - pipeline: Orchestration of the full pipeline
 
-Usage example
----------------------
-```python
-from pneumophonic_analysis import PneumophonicPipeline, create_config
-from pathlib import Path
 
-# Configuration
-config = create_config(
-    data_root=Path("/path/to/data"),
-    output_root=Path("/path/to/output")
-)
-
-# Pipeline
-pipeline = PneumophonicPipeline(config)
-
-# Analyze a subject
-result = pipeline.analyze_subject("20260218_GaBa")
-
-# Batch analysis
-batch = pipeline.analyze_batch()
-pipeline.export_results(batch, "results.xlsx")
-```
-
-Quick Use
-------------------
-```python
-from pneumophonic_analysis import run_pipeline
-
-results = run_pipeline(
-    data_root="/data/subjects",
-    output_root="/results",
-    tasks=['vowel', 'trill']
-)
-```
 """
 
 __version__ = "1.0.0"
