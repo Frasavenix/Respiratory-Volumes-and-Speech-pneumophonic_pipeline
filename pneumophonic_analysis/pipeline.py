@@ -8,7 +8,7 @@ This module coordinates the complete analysis:
 - Task-based analysis
 - Results export
 
-Reference: Zocco 2025 Thesis - Analysis Protocol
+Reference: Bianca Zocco MSc Thesis - Analysis Protocol
 """
 
 import os

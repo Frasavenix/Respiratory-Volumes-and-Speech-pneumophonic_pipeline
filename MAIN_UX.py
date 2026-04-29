@@ -23,9 +23,9 @@ MODES = {
     '2': ('Extract paired features (BATCH ) -> gen .h5 data files',         'batch_extract.py'),
     '3': ('Plot paired features and Save (SINGLE) -> gen PDFs + open plot tabs',        'plot_paired_features.py'),
     '4': ('Plot paired features and Save (BATCH) !-LONG-!',  'batch_plot_paired.py'),
-    '5': ('M2 correlation analysis',  'm2_correlation.py'),
+    '5': ('M2 correlation analysis7',  'm2_correlation.py'),
     '6': ('Diagnostic tools (OEP headers, sync, inventory)','tools.py'),
-    '7': ('Run legacy acoustic analysis (Zocco pipeline)',  None),
+    '7': ('Run Previous Benchmark pipeline : B. Zocco !-LONG-!',  None),
 }
 
 
