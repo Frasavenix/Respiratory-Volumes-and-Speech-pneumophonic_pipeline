@@ -1,0 +1,433 @@
+﻿
+  scripts\m2_correlation.py:7:1. GLOBAL: per-segment summary statistics correlated across subjects
+  scripts\m2_correlation.py:8:2. TIME-RESOLVED: sliding-window cross-correlation within recordings
+> scripts\m2_correlation.py:9:3. EVENT-ALIGNED: above-FRC vs below-FRC comparison (sustained tasks only)
+  scripts\m2_correlation.py:10:4. SEX-STRATIFIED: global correlations split by sex + partial correlations
+  scripts\m2_correlation.py:11:5. CROSS-CORRELATION WITH LAGS: temporal precedence between respiratory and acoustic events
+  scripts\m2_correlation.py:12:6. BREATH-GROUP: per-breath-group analysis for connected speech
+  scripts\m2_correlation.py:13:7. MFCC-RESPIRATORY: spectral shape correlations with respiratory state
+  scripts\m2_correlation.py:14:
+  scripts\m2_correlation.py:15:Outputs:
+  scripts\m2_correlation.py:16:    data_target/<batch>/m2_correlation/
+  scripts\m2_correlation.py:17:    ├── global_*.pdf                  — Level 1 outputs
+  scripts\m2_correlation.py:18:    ├── time_resolved/                — Level 2 outputs
+> scripts\m2_correlation.py:19:    ├── frc_*.pdf                     — Level 3 outputs
+  scripts\m2_correlation.py:20:    ├── sex_*.pdf                     — Level 4 outputs
+  scripts\m2_correlation.py:21:    ├── lag_*.pdf                     — Level 5 outputs
+  scripts\m2_correlation.py:22:    ├── breath_group_*.pdf            — Level 6 outputs
+  scripts\m2_correlation.py:23:    ├── mfcc_*.pdf                    — Level 7 outputs
+  scripts\m2_correlation.py:24:    └── m2_report.txt                 — text summary
+  scripts\m2_correlation.py:25:
+  scripts\m2_correlation.py:26:Usage:
+  scripts\m2_correlation.py:27:    python m2_correlation.py
+  scripts\m2_correlation.py:28:"""
+  scripts\m2_correlation.py:29:import logging
+  scripts\m2_correlation.py:30:from pathlib import Path
+  scripts\m2_correlation.py:31:import numpy as np
+  scripts\m2_correlation.py:32:import pandas as pd
+  scripts\m2_correlation.py:33:import matplotlib
+  scripts\m2_correlation.py:34:matplotlib.use('Agg')
+  scripts\m2_correlation.py:35:import matplotlib.pyplot as plt
+  scripts\m2_correlation.py:36:import seaborn as sns
+  scripts\m2_correlation.py:37:from scipy import stats
+  scripts\m2_correlation.py:38:from scipy.signal import correlate
+  scripts\m2_correlation.py:39:from pneumophonic_analysis.paired_features import PairedFeatureExtractor
+  scripts\m2_correlation.py:40:
+  scripts\m2_correlation.py:41:logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+  scripts\m2_correlation.py:42:logger = logging.getLogger(__name__)
+  scripts\m2_correlation.py:43:
+  scripts\m2_correlation.py:44:# ---- Paths ----
+  scripts\m2_correlation.py:45:PROJECT_ROOT = Path(__file__).resolve().parent.parent
+  scripts\m2_correlation.py:46:DATA_ROOT    = PROJECT_ROOT / "data_root"
+  scripts\m2_correlation.py:47:DATA_TARGET  = PROJECT_ROOT / "data_target"
+  scripts\m2_correlation.py:48:
+  scripts\m2_correlation.py:49:BATCHES = ["healthy_subjects", "pathological_subjects"]
+  scripts\m2_correlation.py:50:
+  scripts\m2_correlation.py:51:# ---- Batch selection ----
+  scripts\m2_correlation.py:52:def select_batch():
+  scripts\m2_correlation.py:53:    print("\nAvailable batches:")
+  scripts\m2_correlation.py:54:    for idx, name in enumerate(BATCHES):
+  scripts\m2_correlation.py:55:        print(f"  [{idx}] {name}")
+  scripts\m2_correlation.py:56:    while True:
+  scripts\m2_correlation.py:57:        sel = input("Select batch by number: ")
+  scripts\m2_correlation.py:58:        if sel.isdigit() and 0 <= int(sel) < len(BATCHES):
+  scripts\m2_correlation.py:59:            return BATCHES[int(sel)]
+  scripts\m2_correlation.py:371:
+  scripts\m2_correlation.py:372:# =====================================================================
+> scripts\m2_correlation.py:373:# LEVEL 3: EVENT-ALIGNED (FRC crossing)
+  scripts\m2_correlation.py:374:# =====================================================================
+  scripts\m2_correlation.py:375:
+> scripts\m2_correlation.py:376:def run_frc_analysis(paired_dir, output_dir):
+> scripts\m2_correlation.py:377:    """Level 3: compare audio features above vs below FRC."""
+  scripts\m2_correlation.py:378:    print("\n" + "="*60)
+> scripts\m2_correlation.py:379:    print("LEVEL 3: Event-aligned FRC analysis")
+  scripts\m2_correlation.py:380:    print("="*60)
+  scripts\m2_correlation.py:381:
+> scripts\m2_correlation.py:382:    frc_tasks = {'a_2', 'a_3', 'a_7'}
+  scripts\m2_correlation.py:383:    h5_files = sorted(paired_dir.glob("*.h5"))
+> scripts\m2_correlation.py:384:    frc_results = []
+  scripts\m2_correlation.py:385:
+  scripts\m2_correlation.py:386:    for h5 in h5_files:
+  scripts\m2_correlation.py:387:        try:
+  scripts\m2_correlation.py:388:            df, meta = PairedFeatureExtractor.load_hdf5(h5)
+  scripts\m2_correlation.py:389:            task = meta.get('task_name', '')
+  scripts\m2_correlation.py:390:            sid = meta.get('subject_id', '')
+> scripts\m2_correlation.py:391:            if task not in frc_tasks:
+  scripts\m2_correlation.py:392:                continue
+  scripts\m2_correlation.py:393:
+  scripts\m2_correlation.py:394:            dcw = df['delta_vcw'].values
+> scripts\m2_correlation.py:395:            peak_idx = np.argmax(dcw)
+  scripts\m2_correlation.py:396:            post_peak = dcw[peak_idx:]
+> scripts\m2_correlation.py:397:            descending_crossings = np.where((post_peak[:-1] > 0) & (post_peak[1:] <= 0))[0]
+  scripts\m2_correlation.py:398:
+> scripts\m2_correlation.py:399:            if len(descending_crossings) > 0:
+> scripts\m2_correlation.py:400:                cross_idx = peak_idx + descending_crossings[0]
+  scripts\m2_correlation.py:401:            else:
+  scripts\m2_correlation.py:402:                cross_idx = peak_idx + len(post_peak) // 2
+  scripts\m2_correlation.py:403:                if cross_idx >= len(df) - 20:
+  scripts\m2_correlation.py:404:                    continue
+  scripts\m2_correlation.py:405:
+  scripts\m2_correlation.py:406:            above = df.iloc[:cross_idx]
+  scripts\m2_correlation.py:407:            below = df.iloc[cross_idx:]
+  scripts\m2_correlation.py:408:            if len(above) < 20 or len(below) < 20:
+  scripts\m2_correlation.py:409:                continue
+  scripts\m2_correlation.py:410:
+  scripts\m2_correlation.py:411:            above_v = above[above['voiced'] == 1.0]
+  scripts\m2_correlation.py:412:            below_v = below[below['voiced'] == 1.0]
+  scripts\m2_correlation.py:413:            if len(above_v) < 10 or len(below_v) < 10:
+  scripts\m2_correlation.py:414:                continue
+  scripts\m2_correlation.py:415:
+  scripts\m2_correlation.py:416:            result = {
+  scripts\m2_correlation.py:417:                'subject_id': sid, 'task': task,
+> scripts\m2_correlation.py:418:                'frc_cross_time': df['time'].iloc[cross_idx],
+  scripts\m2_correlation.py:419:                'duration_above': len(above) * 0.015,
+  scripts\m2_correlation.py:420:                'duration_below': len(below) * 0.015,
+  scripts\m2_correlation.py:421:                'f0_above': np.nanmean(above_v['f0']),
+  scripts\m2_correlation.py:422:                'energy_above': above_v['energy'].mean(),
+  scripts\m2_correlation.py:423:                'spectral_centroid_above': above_v['spectral_centroid'].mean(),
+  scripts\m2_correlation.py:424:                'f0_below': np.nanmean(below_v['f0']),
+  scripts\m2_correlation.py:425:                'energy_below': below_v['energy'].mean(),
+  scripts\m2_correlation.py:426:                'spectral_centroid_below': below_v['spectral_centroid'].mean(),
+  scripts\m2_correlation.py:427:                'flow_cw_above': above['flow_cw'].mean(),
+  scripts\m2_correlation.py:428:                'flow_cw_below': below['flow_cw'].mean(),
+  scripts\m2_correlation.py:429:                'pct_rc_above': above['pct_rc'].mean(),
+  scripts\m2_correlation.py:430:                'pct_rc_below': below['pct_rc'].mean(),
+  scripts\m2_correlation.py:431:            }
+  scripts\m2_correlation.py:432:            result['f0_shift'] = result['f0_below'] - result['f0_above']
+  scripts\m2_correlation.py:433:            result['energy_shift'] = result['energy_below'] - result['energy_above']
+  scripts\m2_correlation.py:434:            result['pct_rc_shift'] = result['pct_rc_below'] - result['pct_rc_above']
+  scripts\m2_correlation.py:435:            result['flow_shift'] = result['flow_cw_below'] - result['flow_cw_above']
+> scripts\m2_correlation.py:436:            frc_results.append(result)
+  scripts\m2_correlation.py:437:        except Exception as e:
+> scripts\m2_correlation.py:438:            logger.warning(f"  FRC analysis failed for {h5.name}: {e}")
+  scripts\m2_correlation.py:439:
+> scripts\m2_correlation.py:440:    if not frc_results:
+> scripts\m2_correlation.py:441:        print("  No valid FRC segments found.")
+  scripts\m2_correlation.py:442:        return pd.DataFrame()
+  scripts\m2_correlation.py:443:
+> scripts\m2_correlation.py:444:    frc_df = pd.DataFrame(frc_results)
+> scripts\m2_correlation.py:445:    frc_df.to_csv(output_dir / "frc_analysis.csv", index=False)
+> scripts\m2_correlation.py:446:    print(f"  Analyzed {len(frc_df)} segments from {frc_df['subject_id'].nunique()} subjects")
+  scripts\m2_correlation.py:447:
+  scripts\m2_correlation.py:448:    # ---- Shift histograms ----
+  scripts\m2_correlation.py:449:    shift_cols = [
+> scripts\m2_correlation.py:450:        ('f0_shift', 'F0 shift (Hz)', 'Below-Above FRC'),
+> scripts\m2_correlation.py:451:        ('energy_shift', 'Energy shift', 'Below-Above FRC'),
+> scripts\m2_correlation.py:452:        ('pct_rc_shift', '%RC shift', 'Below-Above FRC'),
+> scripts\m2_correlation.py:453:        ('flow_shift', 'Flow shift (L/s)', 'Below-Above FRC'),
+  scripts\m2_correlation.py:454:    ]
+  scripts\m2_correlation.py:455:    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+  scripts\m2_correlation.py:456:    for idx, (col, ylabel, xlabel) in enumerate(shift_cols):
+  scripts\m2_correlation.py:457:        ax = axes.flatten()[idx]
+> scripts\m2_correlation.py:458:        data = frc_df[col].dropna()
+  scripts\m2_correlation.py:459:        ax.hist(data, bins=15, edgecolor='black', alpha=0.7, color='teal')
+  scripts\m2_correlation.py:460:        ax.axvline(0, color='gray', linestyle='--')
+  scripts\m2_correlation.py:461:        ax.axvline(data.median(), color='red', linestyle='--', label=f'median={data.median():.4f}')
+  scripts\m2_correlation.py:462:        ax.set_xlabel(ylabel)
+  scripts\m2_correlation.py:463:        ax.set_ylabel('Count')
+  scripts\m2_correlation.py:464:        ax.set_title(f'{xlabel}: {ylabel}')
+  scripts\m2_correlation.py:465:        ax.legend(fontsize=8)
+  scripts\m2_correlation.py:466:        if len(data) > 5:
+  scripts\m2_correlation.py:467:            try:
+  scripts\m2_correlation.py:468:                stat, p = stats.wilcoxon(data)
+  scripts\m2_correlation.py:469:                ax.annotate(f'Wilcoxon p={p:.3e}', xy=(0.05, 0.85), xycoords='axes fraction',
+  scripts\m2_correlation.py:470:                           fontsize=9, bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+  scripts\m2_correlation.py:471:            except Exception:
+  scripts\m2_correlation.py:472:                pass
+> scripts\m2_correlation.py:473:    plt.suptitle('Effect of FRC Crossing on Audio and Respiratory Features', fontsize=13)
+  scripts\m2_correlation.py:474:    plt.tight_layout()
+> scripts\m2_correlation.py:475:    fig.savefig(output_dir / "frc_shifts.pdf", bbox_inches='tight')
+  scripts\m2_correlation.py:476:    plt.close(fig)
+> scripts\m2_correlation.py:477:    print("  Saved: frc_shifts.pdf")
+  scripts\m2_correlation.py:478:
+  scripts\m2_correlation.py:479:    # ---- Paired scatter ----
+  scripts\m2_correlation.py:480:    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+  scripts\m2_correlation.py:481:    for ax, (a_col, b_col, label) in zip(axes, [
+  scripts\m2_correlation.py:482:        ('f0_above', 'f0_below', 'F0 (Hz)'),
+  scripts\m2_correlation.py:483:        ('energy_above', 'energy_below', 'Energy'),
+  scripts\m2_correlation.py:484:        ('pct_rc_above', 'pct_rc_below', '%RC'),
+  scripts\m2_correlation.py:485:    ]):
+> scripts\m2_correlation.py:486:        valid = frc_df[[a_col, b_col]].dropna()
+  scripts\m2_correlation.py:487:        ax.scatter(valid[a_col], valid[b_col], alpha=0.6, s=30, color='teal')
+  scripts\m2_correlation.py:488:        lims = [min(valid[a_col].min(), valid[b_col].min()),
+  scripts\m2_correlation.py:489:                max(valid[a_col].max(), valid[b_col].max())]
+  scripts\m2_correlation.py:490:        ax.plot(lims, lims, 'k--', alpha=0.5, label='identity')
+> scripts\m2_correlation.py:491:        ax.set_xlabel(f'{label} - Above FRC')
+> scripts\m2_correlation.py:492:        ax.set_ylabel(f'{label} - Below FRC')
+> scripts\m2_correlation.py:493:        ax.set_title(f'{label}: Above vs Below FRC')
+  scripts\m2_correlation.py:494:        ax.legend()
+> scripts\m2_correlation.py:495:    plt.suptitle('Paired Comparison: Above vs Below FRC', fontsize=13)
+  scripts\m2_correlation.py:496:    plt.tight_layout()
+> scripts\m2_correlation.py:497:    fig.savefig(output_dir / "frc_paired_scatter.pdf", bbox_inches='tight')
+  scripts\m2_correlation.py:498:    plt.close(fig)
+> scripts\m2_correlation.py:499:    print("  Saved: frc_paired_scatter.pdf")
+  scripts\m2_correlation.py:500:
+> scripts\m2_correlation.py:501:    return frc_df
+  scripts\m2_correlation.py:502:
+  scripts\m2_correlation.py:503:
+  scripts\m2_correlation.py:504:# =====================================================================
+  scripts\m2_correlation.py:505:# LEVEL 4: SEX-STRATIFIED correlations
+  scripts\m2_correlation.py:506:# =====================================================================
+  scripts\m2_correlation.py:507:
+  scripts\m2_correlation.py:508:def run_sex_stratified(summary_df, meta_df, output_dir):
+  scripts\m2_correlation.py:509:    """Level 4: split correlations by sex + partial correlations."""
+  scripts\m2_correlation.py:510:    print("\n" + "="*60)
+  scripts\m2_correlation.py:511:    print("LEVEL 4: Sex-stratified correlations")
+  scripts\m2_correlation.py:512:    print("="*60)
+  scripts\m2_correlation.py:513:
+  scripts\m2_correlation.py:514:    if meta_df is None or 'sex' not in meta_df.columns:
+  scripts\m2_correlation.py:515:        print("  No sex metadata available - skipping")
+  scripts\m2_correlation.py:516:        return
+  scripts\m2_correlation.py:517:
+  scripts\m2_correlation.py:518:    # Merge sex info into summary
+  scripts\m2_correlation.py:519:    merged = summary_df.merge(meta_df, on='subject_id', how='left')
+  scripts\m2_correlation.py:520:    merged = merged.dropna(subset=['sex'])
+  scripts\m2_correlation.py:521:    n_m = (merged['sex'] == 'M').sum()
+  scripts\m2_correlation.py:522:    n_f = (merged['sex'] == 'F').sum()
+  scripts\m2_correlation.py:523:    print(f"  Segments with sex info: {len(merged)} (M={n_m}, F={n_f})")
+  scripts\m2_correlation.py:524:
+  scripts\m2_correlation.py:525:    if n_m < 10 or n_f < 10:
+  scripts\m2_correlation.py:526:        print("  Not enough data in each group - skipping")
+  scripts\m2_correlation.py:527:        return
+  scripts\m2_correlation.py:528:
+  scripts\m2_correlation.py:529:    audio_cols = ['f0_mean', 'f0_std', 'energy_mean', 'energy_std', 'spectral_centroid_mean']
+  scripts\m2_correlation.py:530:    oep_cols = ['delta_vcw_range', 'flow_cw_mean', 'flow_cw_std', 'pct_rc_mean', 'pct_rc_std']
+  scripts\m2_correlation.py:531:    all_cols = audio_cols + oep_cols
+  scripts\m2_correlation.py:532:    available = [c for c in all_cols if c in merged.columns]
+  scripts\m2_correlation.py:533:
+  scripts\m2_correlation.py:534:    # ---- Side-by-side heatmaps ----
+  scripts\m2_correlation.py:535:    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
+  scripts\m2_correlation.py:536:
+  scripts\m2_correlation.py:537:    males = merged[merged['sex'] == 'M'][available].dropna()
+  scripts\m2_correlation.py:538:    females = merged[merged['sex'] == 'F'][available].dropna()
+  scripts\m2_correlation.py:539:
+  scripts\m2_correlation.py:540:    if len(males) > 10:
+  scripts\m2_correlation.py:541:        sns.heatmap(males.corr(), annot=True, fmt='.2f', cmap='RdBu_r',
+  scripts\m2_correlation.py:659:    lags_sec = lags_frames / fps
+  scripts\m2_correlation.py:660:
+> scripts\m2_correlation.py:661:    peak_idx = np.argmax(np.abs(xcorr))
+  scripts\m2_correlation.py:662:    peak_lag_sec = lags_sec[peak_idx]
+  scripts\m2_correlation.py:663:    peak_r = xcorr[peak_idx]
+  scripts\m2_correlation.py:664:
+  scripts\m2_correlation.py:665:    return lags_sec, xcorr, peak_lag_sec, peak_r
+  scripts\m2_correlation.py:666:
+  scripts\m2_correlation.py:667:
+  scripts\m2_correlation.py:668:def run_lag_analysis(paired_dir, output_dir):
+  scripts\m2_correlation.py:669:    """Level 5: cross-correlation with temporal lags."""
+  scripts\m2_correlation.py:670:    print("\n" + "="*60)
+  scripts\m2_correlation.py:671:    print("LEVEL 5: Cross-correlation with time lags")
+  scripts\m2_correlation.py:672:    print("="*60)
+  scripts\m2_correlation.py:673:
+  scripts\m2_correlation.py:674:    h5_files = sorted(paired_dir.glob("*.h5"))
+  scripts\m2_correlation.py:675:    fps = 66.67  # approximate frame rate
+  scripts\m2_correlation.py:676:    max_lag_frames = 33  # ~0.5s
+  scripts\m2_correlation.py:677:
+  scripts\m2_correlation.py:678:    lag_results = []
+  scripts\m2_correlation.py:679:    all_xcorr_flow_energy = []
+  scripts\m2_correlation.py:680:    all_xcorr_flow_f0 = []
+  scripts\m2_correlation.py:681:
+  scripts\m2_correlation.py:682:    for h5 in h5_files:
+  scripts\m2_correlation.py:683:        try:
+  scripts\m2_correlation.py:684:            df, meta = PairedFeatureExtractor.load_hdf5(h5)
+  scripts\m2_correlation.py:685:            task = meta.get('task_name', '')
+  scripts\m2_correlation.py:686:            sid = meta.get('subject_id', '')
+  scripts\m2_correlation.py:687:
+  scripts\m2_correlation.py:688:            if task not in SUSTAINED_TASKS or len(df) < 100:
+  scripts\m2_correlation.py:689:                continue
+  scripts\m2_correlation.py:690:
+  scripts\m2_correlation.py:691:            voiced = df[df['voiced'] == 1.0]
+  scripts\m2_correlation.py:692:            if len(voiced) < 50:
+  scripts\m2_correlation.py:693:                continue
+  scripts\m2_correlation.py:694:
+  scripts\m2_correlation.py:695:            # Flow -> Energy lag
+  scripts\m2_correlation.py:696:            lags_s, xcorr_fe, peak_lag_fe, peak_r_fe = compute_xcorr_lag(
+  scripts\m2_correlation.py:697:                voiced['flow_cw'].values, voiced['energy'].values,
+  scripts\m2_correlation.py:698:                max_lag_frames=max_lag_frames, fps=fps)
+  scripts\m2_correlation.py:699:
+  scripts\m2_correlation.py:700:            # Flow -> F0 lag
+  scripts\m2_correlation.py:701:            f0_valid = voiced.dropna(subset=['f0'])
+  scripts\m2_correlation.py:741:                        alpha=0.2, color='steelblue')
+  scripts\m2_correlation.py:742:        ax1.axvline(0, color='gray', linestyle='--', alpha=0.5)
+> scripts\m2_correlation.py:743:        peak_idx = np.argmax(np.abs(mean_xcorr))
+  scripts\m2_correlation.py:744:        ax1.axvline(lags_sec[peak_idx], color='red', linestyle='--',
+  scripts\m2_correlation.py:745:                   label=f'peak lag = {lags_sec[peak_idx]*1000:.0f} ms')
+  scripts\m2_correlation.py:746:        ax1.set_xlabel('Lag (s) [negative = flow leads]')
+  scripts\m2_correlation.py:747:        ax1.set_ylabel('Cross-correlation')
+  scripts\m2_correlation.py:748:        ax1.set_title('Flow CW vs Energy')
+  scripts\m2_correlation.py:749:        ax1.legend()
+  scripts\m2_correlation.py:750:
+  scripts\m2_correlation.py:751:    if all_xcorr_flow_f0:
+  scripts\m2_correlation.py:752:        mean_xcorr = np.mean(all_xcorr_flow_f0, axis=0)
+  scripts\m2_correlation.py:753:        std_xcorr = np.std(all_xcorr_flow_f0, axis=0)
+  scripts\m2_correlation.py:754:        ax2.plot(lags_sec, mean_xcorr, color='purple', linewidth=2)
+  scripts\m2_correlation.py:755:        ax2.fill_between(lags_sec, mean_xcorr - std_xcorr, mean_xcorr + std_xcorr,
+  scripts\m2_correlation.py:756:                        alpha=0.2, color='purple')
+  scripts\m2_correlation.py:757:        ax2.axvline(0, color='gray', linestyle='--', alpha=0.5)
+> scripts\m2_correlation.py:758:        peak_idx = np.argmax(np.abs(mean_xcorr))
+  scripts\m2_correlation.py:759:        ax2.axvline(lags_sec[peak_idx], color='red', linestyle='--',
+  scripts\m2_correlation.py:760:                   label=f'peak lag = {lags_sec[peak_idx]*1000:.0f} ms')
+  scripts\m2_correlation.py:761:        ax2.set_xlabel('Lag (s) [negative = flow leads]')
+  scripts\m2_correlation.py:762:        ax2.set_ylabel('Cross-correlation')
+  scripts\m2_correlation.py:763:        ax2.set_title('Flow CW vs F0')
+  scripts\m2_correlation.py:764:        ax2.legend()
+  scripts\m2_correlation.py:765:
+  scripts\m2_correlation.py:766:    plt.suptitle('Mean Cross-Correlation with Time Lags (sustained tasks)', fontsize=13)
+  scripts\m2_correlation.py:767:    plt.tight_layout()
+  scripts\m2_correlation.py:768:    fig.savefig(output_dir / "lag_cross_correlation.pdf", bbox_inches='tight')
+  scripts\m2_correlation.py:769:    plt.close(fig)
+  scripts\m2_correlation.py:770:    print("  Saved: lag_cross_correlation.pdf")
+  scripts\m2_correlation.py:771:
+  scripts\m2_correlation.py:772:    # ---- Peak lag distribution ----
+  scripts\m2_correlation.py:773:    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+  scripts\m2_correlation.py:774:
+  scripts\m2_correlation.py:775:    data_fe = lag_df['lag_flow_energy_sec'].dropna() * 1000  # to ms
+  scripts\m2_correlation.py:776:    ax1.hist(data_fe, bins=20, edgecolor='black', alpha=0.7, color='steelblue')
+  scripts\m2_correlation.py:777:    ax1.axvline(data_fe.median(), color='red', linestyle='--',
+  scripts\m2_correlation.py:778:               label=f'median={data_fe.median():.0f} ms')
+  scripts\m2_correlation.py:779:    ax1.axvline(0, color='gray', linestyle='--', alpha=0.5)
+  scripts\m2_correlation.py:780:    ax1.set_xlabel('Peak lag (ms)')
+  scripts\m2_correlation.py:781:    ax1.set_ylabel('Count')
+  scripts\m2_correlation.py:782:    ax1.set_title('Flow -> Energy: Peak Lag Distribution')
+  scripts\m2_correlation.py:783:    ax1.legend()
+  scripts\m2_correlation.py:784:
+  scripts\m2_correlation.py:785:    data_ff = lag_df['lag_flow_f0_sec'].dropna() * 1000
+  scripts\m2_correlation.py:786:    ax2.hist(data_ff, bins=20, edgecolor='black', alpha=0.7, color='purple')
+  scripts\m2_correlation.py:787:    ax2.axvline(data_ff.median(), color='red', linestyle='--',
+  scripts\m2_correlation.py:788:               label=f'median={data_ff.median():.0f} ms')
+  scripts\m2_correlation.py:789:    ax2.axvline(0, color='gray', linestyle='--', alpha=0.5)
+  scripts\m2_correlation.py:790:    ax2.set_xlabel('Peak lag (ms)')
+  scripts\m2_correlation.py:791:    ax2.set_ylabel('Count')
+  scripts\m2_correlation.py:792:    ax2.set_title('Flow -> F0: Peak Lag Distribution')
+  scripts\m2_correlation.py:793:    ax2.legend()
+  scripts\m2_correlation.py:794:
+  scripts\m2_correlation.py:795:    plt.suptitle('Distribution of Peak Cross-Correlation Lags', fontsize=13)
+  scripts\m2_correlation.py:796:    plt.tight_layout()
+  scripts\m2_correlation.py:797:    fig.savefig(output_dir / "lag_distributions.pdf", bbox_inches='tight')
+  scripts\m2_correlation.py:798:    plt.close(fig)
+  scripts\m2_correlation.py:1055:# =====================================================================
+  scripts\m2_correlation.py:1056:
+> scripts\m2_correlation.py:1057:def write_report(summary_df, frc_df, lag_df, bg_df, mfcc_df, meta_df, output_dir):
+  scripts\m2_correlation.py:1058:    """Write a comprehensive text summary of all M2 findings."""
+  scripts\m2_correlation.py:1059:    report_path = output_dir / "m2_report.txt"
+  scripts\m2_correlation.py:1060:
+  scripts\m2_correlation.py:1061:    with open(report_path, 'w', encoding='utf-8') as f:
+  scripts\m2_correlation.py:1062:        f.write("M2 - EXPLORATORY CORRELATION ANALYSIS REPORT (Extended)\n")
+  scripts\m2_correlation.py:1063:        f.write("=" * 60 + "\n\n")
+  scripts\m2_correlation.py:1064:
+  scripts\m2_correlation.py:1065:        f.write(f"Total segments analyzed: {len(summary_df)}\n")
+  scripts\m2_correlation.py:1066:        f.write(f"Unique subjects: {summary_df['subject_id'].nunique()}\n")
+  scripts\m2_correlation.py:1067:        f.write(f"Tasks: {sorted(summary_df['task'].unique())}\n\n")
+  scripts\m2_correlation.py:1068:
+  scripts\m2_correlation.py:1069:        # Within-segment correlations
+  scripts\m2_correlation.py:1070:        f.write("WITHIN-SEGMENT CORRELATIONS (per recording)\n")
+  scripts\m2_correlation.py:1071:        f.write("-" * 40 + "\n")
+  scripts\m2_correlation.py:1072:        for col, label in [
+  scripts\m2_correlation.py:1073:            ('corr_energy_deltavcw', 'Energy vs dVcw'),
+  scripts\m2_correlation.py:1074:            ('corr_f0_flowcw', 'F0 vs Flow CW'),
+  scripts\m2_correlation.py:1075:            ('corr_energy_flowcw', 'Energy vs Flow CW'),
+  scripts\m2_correlation.py:1076:        ]:
+  scripts\m2_correlation.py:1077:            if col in summary_df.columns:
+  scripts\m2_correlation.py:1078:                data = summary_df[col].dropna()
+  scripts\m2_correlation.py:1079:                f.write(f"  {label}:\n")
+  scripts\m2_correlation.py:1080:                f.write(f"    median r = {data.median():.3f}\n")
+  scripts\m2_correlation.py:1081:                f.write(f"    mean r   = {data.mean():.3f} +/- {data.std():.3f}\n")
+  scripts\m2_correlation.py:1082:                f.write(f"    range    = [{data.min():.3f}, {data.max():.3f}]\n")
+  scripts\m2_correlation.py:1083:                f.write(f"    n        = {len(data)}\n\n")
+  scripts\m2_correlation.py:1084:
+> scripts\m2_correlation.py:1085:        # FRC analysis
+> scripts\m2_correlation.py:1086:        if frc_df is not None and len(frc_df) > 0:
+> scripts\m2_correlation.py:1087:            f.write("\nFRC CROSSING ANALYSIS\n")
+  scripts\m2_correlation.py:1088:            f.write("-" * 40 + "\n")
+> scripts\m2_correlation.py:1089:            f.write(f"  Segments with FRC crossing: {len(frc_df)}\n\n")
+  scripts\m2_correlation.py:1090:            for col, label in [
+  scripts\m2_correlation.py:1091:                ('f0_shift', 'F0 shift (Below-Above)'),
+  scripts\m2_correlation.py:1092:                ('energy_shift', 'Energy shift'),
+  scripts\m2_correlation.py:1093:                ('pct_rc_shift', '%RC shift'),
+  scripts\m2_correlation.py:1094:            ]:
+> scripts\m2_correlation.py:1095:                data = frc_df[col].dropna()
+  scripts\m2_correlation.py:1096:                f.write(f"  {label}:\n")
+  scripts\m2_correlation.py:1097:                f.write(f"    median = {data.median():.4f}\n")
+  scripts\m2_correlation.py:1098:                f.write(f"    mean   = {data.mean():.4f} +/- {data.std():.4f}\n")
+  scripts\m2_correlation.py:1099:                if len(data) > 5:
+  scripts\m2_correlation.py:1100:                    try:
+  scripts\m2_correlation.py:1101:                        stat, p = stats.wilcoxon(data)
+  scripts\m2_correlation.py:1102:                        f.write(f"    Wilcoxon p = {p:.3e}\n")
+  scripts\m2_correlation.py:1103:                    except Exception:
+  scripts\m2_correlation.py:1104:                        pass
+  scripts\m2_correlation.py:1105:                f.write("\n")
+  scripts\m2_correlation.py:1106:
+  scripts\m2_correlation.py:1107:        # Sex-stratified
+  scripts\m2_correlation.py:1108:        if meta_df is not None and len(meta_df) > 0:
+  scripts\m2_correlation.py:1109:            f.write("\nSEX-STRATIFIED ANALYSIS\n")
+  scripts\m2_correlation.py:1110:            f.write("-" * 40 + "\n")
+  scripts\m2_correlation.py:1111:            merged = summary_df.merge(meta_df, on='subject_id', how='left').dropna(subset=['sex'])
+  scripts\m2_correlation.py:1112:            n_m = (merged['sex'] == 'M').sum()
+  scripts\m2_correlation.py:1113:            n_f = (merged['sex'] == 'F').sum()
+  scripts\m2_correlation.py:1114:            f.write(f"  Male segments: {n_m}\n")
+  scripts\m2_correlation.py:1115:            f.write(f"  Female segments: {n_f}\n")
+  scripts\m2_correlation.py:1116:            f.write("  See: sex_partial_correlations.csv for details\n\n")
+  scripts\m2_correlation.py:1117:
+  scripts\m2_correlation.py:1118:        # Lag analysis
+  scripts\m2_correlation.py:1119:        if lag_df is not None and len(lag_df) > 0:
+  scripts\m2_correlation.py:1120:            f.write("\nCROSS-CORRELATION LAG ANALYSIS\n")
+  scripts\m2_correlation.py:1121:            f.write("-" * 40 + "\n")
+  scripts\m2_correlation.py:1122:            for col, label in [
+  scripts\m2_correlation.py:1123:                ('lag_flow_energy_sec', 'Flow -> Energy peak lag'),
+  scripts\m2_correlation.py:1124:                ('lag_flow_f0_sec', 'Flow -> F0 peak lag'),
+  scripts\m2_correlation.py:1125:            ]:
+  scripts\m2_correlation.py:1126:                data = lag_df[col].dropna() * 1000  # to ms
+  scripts\m2_correlation.py:1127:                f.write(f"  {label}:\n")
+  scripts\m2_correlation.py:1128:                f.write(f"    median = {data.median():.1f} ms\n")
+  scripts\m2_correlation.py:1129:                f.write(f"    mean   = {data.mean():.1f} +/- {data.std():.1f} ms\n")
+  scripts\m2_correlation.py:1130:                f.write(f"    n      = {len(data)}\n\n")
+  scripts\m2_correlation.py:1131:
+  scripts\m2_correlation.py:1132:        # Breath-group
+  scripts\m2_correlation.py:1133:        if bg_df is not None and len(bg_df) > 0:
+  scripts\m2_correlation.py:1134:            f.write("\nBREATH-GROUP ANALYSIS (text reading)\n")
+  scripts\m2_correlation.py:1135:            f.write("-" * 40 + "\n")
+  scripts\m2_correlation.py:1178:    time_corrs = run_time_resolved(paired_dir, output_dir, max_subjects=10)
+  scripts\m2_correlation.py:1179:
+> scripts\m2_correlation.py:1180:    # Level 3: FRC
+> scripts\m2_correlation.py:1181:    frc_df = run_frc_analysis(paired_dir, output_dir)
+  scripts\m2_correlation.py:1182:
+  scripts\m2_correlation.py:1183:    # Level 4: Sex-stratified
+  scripts\m2_correlation.py:1184:    run_sex_stratified(summary_df, meta_df, output_dir)
+  scripts\m2_correlation.py:1185:
+  scripts\m2_correlation.py:1186:    # Level 5: Lag analysis
+  scripts\m2_correlation.py:1187:    lag_df = run_lag_analysis(paired_dir, output_dir)
+  scripts\m2_correlation.py:1188:
+  scripts\m2_correlation.py:1189:    # Level 6: Breath-group
+  scripts\m2_correlation.py:1190:    bg_df = run_breath_group_analysis(paired_dir, output_dir)
+  scripts\m2_correlation.py:1191:
+  scripts\m2_correlation.py:1192:    # Level 7: MFCC-respiratory
+  scripts\m2_correlation.py:1193:    mfcc_df = run_mfcc_analysis(paired_dir, output_dir)
+  scripts\m2_correlation.py:1194:
+  scripts\m2_correlation.py:1195:    # Report
+> scripts\m2_correlation.py:1196:    write_report(summary_df, frc_df, lag_df, bg_df, mfcc_df, meta_df, output_dir)
+  scripts\m2_correlation.py:1197:
+  scripts\m2_correlation.py:1198:    print("\n" + "="*60)
+  scripts\m2_correlation.py:1199:    print("M2 COMPLETE (Extended)")
+  scripts\m2_correlation.py:1200:    print(f"All outputs in: {output_dir.relative_to(PROJECT_ROOT)}")
+  scripts\m2_correlation.py:1201:    print("="*60)
+
+

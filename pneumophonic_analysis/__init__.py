@@ -174,6 +174,11 @@ __all__ = [
     "SubjectAnalysis",
     "BatchAnalysis",
     "run_pipeline",
+
+    "PairedEffectSize",
+    "compute_paired_effect_size",
+    "median_absolute_deviation",
+    "interpret_cohen_d",
 ]
 
 # Paired features
@@ -181,4 +186,11 @@ from .paired_features import (
     PairedFeatureExtractor,
     PairedFrame,
     OEPFrameFeatures,
+)
+
+from .effect_size import (
+    PairedEffectSize,
+    compute_paired_effect_size,
+    median_absolute_deviation,
+    interpret_cohen_d,
 )
