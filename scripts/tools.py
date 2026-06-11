@@ -76,9 +76,11 @@ def inspect_oep_header():
     loader = DataLoader(subj)
     oep = loader.load_oep_data(f"csv/{csv_path.name}")
 
+    fs = int(round(1 / np.median(np.diff(oep['time'].values)))) if len(oep) > 1 else 50
     print(f"\n--- {csv_path.name} ---")
     print(f"Shape: {oep.shape[0]} rows x {oep.shape[1]} columns")
-    print(f"Duration: {oep.shape[0] / 50:.1f}s (at 50 Hz)")
+    print(f"Sample rate: {fs} Hz (from time column)")
+    print(f"Duration: {oep['time'].iloc[-1]:.1f}s")
     print(f"Columns: {oep.columns.tolist()}")
     print(f"\nFirst 5 rows:\n{oep.head()}")
 
@@ -110,12 +112,13 @@ def check_sync_peaks():
     oep = loader.load_oep_data(f"csv/{csvs[idx].name}")
     sync = Synchronizer()
     peaks = sync.detect_sync_onsets_oep(oep)
+    fs = int(round(1 / np.median(np.diff(oep['time'].values)))) if len(oep) > 1 else 50
 
     print(f"\n--- Sync peaks in {csvs[idx].name} ---")
-    print(f"OEP duration: {len(oep) / 50:.1f}s")
+    print(f"OEP duration: {oep['time'].iloc[-1]:.1f}s  (rate {fs} Hz)")
     print(f"Number of peaks: {len(peaks)}")
     print(f"Peak positions (samples): {peaks}")
-    print(f"Peak times (s): {peaks / 50}")
+    print(f"Peak times (s): {peaks / fs}")
 
     # Compare with Excel if available
     excel_path = subj / f"{sid}_audio.xlsx"

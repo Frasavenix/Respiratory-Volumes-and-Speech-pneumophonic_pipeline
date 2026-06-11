@@ -9,7 +9,7 @@ import logging
 import sys
 from pathlib import Path
 import pandas as pd
-from pneumophonic_analysis import create_config
+from pneumophonic_analysis import create_config, select_subject_folders_gui
 from pneumophonic_analysis.paired_features import PairedFeatureExtractor
 
 logging.basicConfig(
@@ -45,16 +45,13 @@ TASK_MAP = {
     'testo': ('testo.wav',          'testo'),
 }
 
-# ---- Selection ----
-def select_batch():
-    print("\nAvailable batches:")
-    for idx, name in enumerate(BATCHES):
-        print(f"  [{idx}] {name}")
-    while True:
-        sel = input("Select batch by number: ")
-        if sel.isdigit() and 0 <= int(sel) < len(BATCHES):
-            return BATCHES[int(sel)]
-        print("Invalid selection. Try again.")
+# ---- Output batch label ----
+def prompt_batch_label(default="healthy_subjects"):
+    """Ask for the output batch label that organises data_target/<label>/paired/."""
+    print("\nOutput batch label (organises data_target/<label>/paired/).")
+    print(f"  Suggestions: {', '.join(BATCHES)}")
+    label = input(f"  Batch label [{default}]: ").strip()
+    return label or default
 
 # ---- Subject discovery ----
 def discover_subjects(batch_dir):
@@ -63,6 +60,29 @@ def discover_subjects(batch_dir):
         d for d in batch_dir.iterdir()
         if d.is_dir() and (d / "renders").exists()
     ])
+
+def expand_selection(folders):
+    """
+    Normalize the user's picks into a flat list of subject folders.
+
+    Each chosen folder is treated as a subject folder; but if a chosen folder
+    instead *contains* subject subfolders (e.g. the user picked a dataset root),
+    it is expanded to those. Keeps both 'pick subjects' and 'pick a root' working.
+    """
+    out = []
+    for f in folders:
+        f = Path(f)
+        if (f / "renders").exists() or (f / "csv").exists():
+            out.append(f)
+        else:
+            found = discover_subjects(f)
+            out.extend(found if found else [f])
+    seen, uniq = set(), []
+    for f in out:
+        if f not in seen:
+            seen.add(f)
+            uniq.append(f)
+    return uniq
 
 # ---- Load timing ----
 def load_timing(subject_folder, subject_id):
@@ -80,16 +100,24 @@ def load_timing(subject_folder, subject_id):
         return None
 
 # ---- Main batch extraction ----
-def run_batch(batch_name, skip_existing=True):
-    source_dir = DATA_ROOT / batch_name
+def run_batch(subjects, batch_name, skip_existing=True):
+    """Extract paired features for an explicit list of subject folders.
+
+    Args:
+        subjects:      list of subject folder Paths (chosen via the file browser)
+        batch_name:    output label -> data_target/<batch_name>/paired/
+        skip_existing: skip subject/task pairs whose .h5 already exists
+    """
     output_dir = DATA_TARGET / batch_name / "paired"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    subjects = discover_subjects(source_dir)
-    print(f"\nFound {len(subjects)} subjects in {batch_name}")
+    print(f"\nExtracting {len(subjects)} subject folder(s) "
+          f"-> {output_dir.relative_to(PROJECT_ROOT)}")
 
+    # data_root is unused by the extractor (each subject folder is passed
+    # explicitly); only output_root matters here.
     config = create_config(
-        data_root=source_dir,
+        data_root=None,
         output_root=DATA_TARGET / batch_name
     )
     extractor = PairedFeatureExtractor(config)
@@ -250,6 +278,8 @@ def run_batch(batch_name, skip_existing=True):
     print(f"\n  Summary saved: {summary_path.relative_to(PROJECT_ROOT)}")
 
     # Show failures if any
+    if summary_df.empty or 'status' not in summary_df.columns:
+        return summary_df
     failures = summary_df[~summary_df['status'].isin(['ok', 'skipped'])]
     if len(failures) > 0:
         print(f"\n  ⚠️  Failures:")
@@ -260,8 +290,29 @@ def run_batch(batch_name, skip_existing=True):
 
 # ---- Entry point ----
 if __name__ == '__main__':
-    batch_name = select_batch()
+    print("=" * 60)
+    print("BATCH PAIRED EXTRACTION")
+    print("=" * 60)
+    print("A file browser will open. Select each subject folder to extract,")
+    print("then press Cancel when you are done (you can pick several).")
+
+    initial = DATA_ROOT if DATA_ROOT.exists() else PROJECT_ROOT
+    subjects = select_subject_folders_gui(
+        title="Select subject folder(s) to extract",
+        initialdir=initial,
+    )
+    subjects = expand_selection(subjects)
+
+    if not subjects:
+        print("\nNo folders selected — nothing to do.")
+        sys.exit(0)
+
+    print(f"\nSelected {len(subjects)} subject folder(s):")
+    for s in subjects:
+        print(f"  - {s}")
+
+    batch_name = prompt_batch_label()
     skip = '--force' not in sys.argv
     if not skip:
         print("  (--force: re-extracting all, including existing files)")
-    run_batch(batch_name, skip_existing=skip)
+    run_batch(subjects, batch_name, skip_existing=skip)

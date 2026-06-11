@@ -334,6 +334,8 @@ class PairedFeatureExtractor:
         audio_end_sec: Optional[float] = None,
         auto_trim_phonation: bool = True,
         trim_top_db: int = 30,
+        trim_highpass_hz: float = 90.0,
+        trim_min_phonation_sec: float = 0.08,
         oep_falling_edge_sec: Optional[float] = None,
     ) -> PairedFrame:
         """
@@ -359,6 +361,15 @@ class PairedFeatureExtractor:
                                  onset/offset within the Excel window using
                                  detect_phonation_bounds (default: True)
             trim_top_db:       Silence threshold in dB for auto-trim (default: 30)
+            trim_highpass_hz:  High-pass cutoff (Hz) applied to the signal used
+                               for auto-trim onset/offset detection only. Stops
+                               a loud low-frequency / DC synchronization pulse
+                               from anchoring the phonation onset. Set 0 to
+                               disable (default: 90)
+            trim_min_phonation_sec: Auto-trim ignores non-silent runs shorter
+                               than this (seconds) — discards the brief edge
+                               clicks of a sync pulse so the onset lands on
+                               sustained phonation (default: 0.08)
             oep_falling_edge_sec: If provided, use this OEP time (seconds) as
                                   the falling edge instead of auto-detecting via
                                   take_number. This comes from the 'falling edge'
@@ -375,6 +386,21 @@ class PairedFeatureExtractor:
         audio, sr = loader.load_audio(audio_filename)
         sync_audio, sr_sync = loader.load_sync_signal()
         oep_df = loader.load_oep_data(oep_csv_path)
+
+        # Auto-detect the OEP sample rate from the CSV 'time' column.
+        # Acquisitions are not uniform: some are 50 Hz, some 100 Hz. Using the
+        # wrong rate time-stretches the OEP, mis-places the sync falling edge,
+        # scales the flows, and desyncs OEP from audio. Trust the data.
+        if 'time' in oep_df.columns and len(oep_df) > 1:
+            dt = float(np.median(np.diff(oep_df['time'].values)))
+            if dt > 0:
+                detected = int(round(1.0 / dt))
+                if detected > 0 and detected != fs_oep:
+                    logger.warning(
+                        f"  OEP rate detected = {detected} Hz from CSV time column "
+                        f"(config default {fs_oep} Hz) — using {detected} Hz"
+                    )
+                    fs_oep = detected
 
         logger.info(
             f"[{loader.subject_id}/{task_name}] "
@@ -438,9 +464,13 @@ class PairedFeatureExtractor:
             coarse_end_sample = int(audio_end_sec * sr)
             coarse_segment = audio[coarse_start_sample:coarse_end_sample]
 
-            # Detect phonation onset/offset within that window
+            # Detect phonation onset/offset within that window. The high-pass
+            # keeps a loud low-frequency / DC sync pulse from anchoring the
+            # onset (see the sync-leak fix); detection only, audio is untouched.
             onset_sample, offset_sample = _detect_bounds(
-                coarse_segment, sr, top_db=trim_top_db
+                coarse_segment, sr, top_db=trim_top_db,
+                highpass_hz=trim_highpass_hz,
+                min_phonation_sec=trim_min_phonation_sec,
             )
 
             # Convert back to absolute times

@@ -372,14 +372,172 @@ def load_master_excel(
 ) -> pd.DataFrame:
     """
     Loads the master Excel file containing data for all subjects.
-    
+
     Args:
         path: Path to the master Excel file
         sheet_name: Name of the sheet to load
-        
+
     Returns:
         DataFrame with the master data
     """
     df = pd.read_excel(path, sheet_name=sheet_name)
     df.columns = df.columns.str.strip()
     return df
+
+
+# ---------------------------------------------------------------------------
+# Interactive folder selection (GUI file browser)
+# ---------------------------------------------------------------------------
+
+def _looks_like_subject_folder(folder: Path) -> bool:
+    """True if the folder has the layout the extractor expects (renders/ or csv/)."""
+    return (folder / "renders").exists() or (folder / "csv").exists()
+
+
+def _select_folders_console(title: str) -> List[Path]:
+    """Fallback used when no GUI is available: type/paste folder paths."""
+    print(f"\n[No file browser available] {title}")
+    print("Paste one folder path per line (blank line to finish):")
+    out: List[Path] = []
+    while True:
+        try:
+            line = input("  folder> ").strip().strip('"').strip("'")
+        except EOFError:
+            break
+        if not line:
+            break
+        p = Path(line)
+        if p.exists() and p.is_dir():
+            out.append(p)
+        else:
+            print(f"    not a directory: {p}")
+    return out
+
+
+def select_folders_gui(
+    title: str = "Select folder(s)",
+    initialdir: Optional[Union[str, Path]] = None,
+    multiple: bool = True,
+) -> List[Path]:
+    """
+    Open a native folder browser and return the chosen folder(s).
+
+    The raw datasets no longer need to live inside ``data_root/``: this lets the
+    user point the pipeline at wherever the subject folders are stored on disk.
+
+    Behaviour:
+        * ``multiple=True``  -> the dialog reopens after each pick so several
+          folders can be chosen; press **Cancel** to finish.
+        * ``multiple=False`` -> a single pick is returned.
+
+    Falls back to a console path prompt if Tkinter / a display is unavailable.
+
+    Args:
+        title:      Dialog window title.
+        initialdir: Folder the browser opens in (defaults to the user home).
+        multiple:   Allow selecting more than one folder.
+
+    Returns:
+        List of selected folder paths (empty list if the user cancels immediately).
+    """
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+    except Exception:
+        return _select_folders_console(title)
+
+    if initialdir is not None:
+        initialdir = str(initialdir)
+
+    folders: List[Path] = []
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        while True:
+            n = len(folders) + 1
+            t = f"{title}  (#{n} — Cancel when done)" if multiple else title
+            sel = filedialog.askdirectory(
+                title=t,
+                initialdir=initialdir,
+                mustexist=True,
+            )
+            if not sel:          # user pressed Cancel / closed the dialog
+                break
+            folders.append(Path(sel))
+            # Next dialog opens where the last pick was
+            initialdir = str(Path(sel).parent)
+            if not multiple:
+                break
+        root.destroy()
+    except Exception as e:
+        if not folders:
+            print(f"  (file browser failed: {e})")
+            return _select_folders_console(title)
+
+    return folders
+
+
+def select_subject_folders_gui(
+    title: str = "Select subject folder(s) to extract",
+    initialdir: Optional[Union[str, Path]] = None,
+    multiple: bool = True,
+    warn_non_subject: bool = True,
+) -> List[Path]:
+    """
+    Folder browser tuned for picking subject folders for paired extraction.
+
+    Same as :func:`select_folders_gui` but emits a warning for any chosen folder
+    that does not look like a subject folder (missing ``renders/`` and ``csv/``).
+    """
+    folders = select_folders_gui(title=title, initialdir=initialdir, multiple=multiple)
+    if warn_non_subject:
+        for f in folders:
+            if not _looks_like_subject_folder(f):
+                print(f"  ⚠️  {f.name}: no renders/ or csv/ subfolder — may not be a subject folder")
+    return folders
+
+
+def select_file_gui(
+    title: str = "Select a file",
+    filetypes: Optional[List[Tuple[str, str]]] = None,
+    initialdir: Optional[Union[str, Path]] = None,
+) -> Optional[Path]:
+    """
+    Open a native file browser and return the chosen file (or None if cancelled).
+
+    Falls back to a console path prompt if Tkinter / a display is unavailable.
+
+    Args:
+        title:      Dialog window title.
+        filetypes:  List of (label, pattern) tuples, e.g. [("WAV", "*.wav")].
+        initialdir: Folder the browser opens in.
+    """
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+    except Exception:
+        print(f"\n[No file browser available] {title}")
+        try:
+            line = input("  file path> ").strip().strip('"').strip("'")
+        except EOFError:
+            return None
+        p = Path(line)
+        return p if (line and p.exists() and p.is_file()) else None
+
+    if initialdir is not None:
+        initialdir = str(initialdir)
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        sel = filedialog.askopenfilename(
+            title=title,
+            initialdir=initialdir,
+            filetypes=filetypes or [("All files", "*.*")],
+        )
+        root.destroy()
+    except Exception as e:
+        print(f"  (file browser failed: {e})")
+        return None
+    return Path(sel) if sel else None

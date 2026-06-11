@@ -44,6 +44,9 @@ from .io_utils import (
     discover_subjects,
     load_master_excel,
     save_audio,
+    select_folders_gui,
+    select_subject_folders_gui,
+    select_file_gui,
 )
 
 # Synchronisation
@@ -134,6 +137,9 @@ __all__ = [
     "discover_subjects",
     "load_master_excel",
     "save_audio",
+    "select_folders_gui",
+    "select_subject_folders_gui",
+    "select_file_gui",
     
     # Sync
     "Synchronizer",

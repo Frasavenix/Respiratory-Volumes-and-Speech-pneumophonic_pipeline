@@ -567,30 +567,61 @@ def detect_phonation_bounds(
     audio: np.ndarray,
     sr: int,
     top_db: int = 45,
-    onset_delta: float = 0.05
+    onset_delta: float = 0.05,
+    highpass_hz: float = 0.0,
+    min_phonation_sec: float = 0.0,
 ) -> Tuple[int, int]:
     """
     DDetects the start and end of phonation.
-    
+
     Args:
         audio: Signal audio
         sr: Sample rate
         top_db: Threshold in dB below the maximum to consider as silence
         onset_delta: Sensitivity of onset detection (lower = more sensitive)
-        
+        highpass_hz: If > 0, the start/end are detected on a high-pass-filtered
+            copy of the audio (cutoff in Hz). This suppresses a loud low-frequency
+            or DC event — such as a leaked synchronization pulse — so it cannot
+            be picked as the phonation onset. The returned indices are on the
+            ORIGINAL time base; the filtered signal is used for detection only.
+        min_phonation_sec: If > 0, non-silent intervals shorter than this are
+            ignored when choosing the start/end. Together with `highpass_hz`
+            this also discards the brief broadband *clicks* at the edges of a
+            sync pulse (which survive the high-pass), so the onset lands on
+            sustained phonation rather than the pulse.
+
     Returns:
         Tuple (start_sample, end_sample)
     """
+    detect_sig = audio
+    # High-pass only for detection, so a DC/low-frequency sync pulse cannot
+    # anchor the onset. filtfilt needs a minimum length; skip very short clips.
+    if highpass_hz and highpass_hz > 0 and len(audio) > 33:
+        wn = highpass_hz / (0.5 * sr)
+        if 0.0 < wn < 1.0:
+            try:
+                b, a = signal.butter(4, wn, btype='high')
+                detect_sig = signal.filtfilt(b, a, audio)
+            except Exception:
+                detect_sig = audio
+
     # Non silent intervals
-    intervals = detect_non_silent_intervals(audio, sr, top_db)
-    
+    intervals = detect_non_silent_intervals(detect_sig, sr, top_db)
+
     if len(intervals) == 0:
         return 0, len(audio)
-    
+
+    # Drop intervals too short to be phonation (e.g. sync-pulse edge clicks).
+    if min_phonation_sec and min_phonation_sec > 0:
+        min_len = int(min_phonation_sec * sr)
+        long_enough = intervals[(intervals[:, 1] - intervals[:, 0]) >= min_len]
+        if len(long_enough) > 0:
+            intervals = long_enough
+
     # Take the first significant interval for the start
     start = intervals[0, 0]
-    
+
     # Take the end of the last interval for the end
     end = intervals[-1, 1]
-    
+
     return start, end

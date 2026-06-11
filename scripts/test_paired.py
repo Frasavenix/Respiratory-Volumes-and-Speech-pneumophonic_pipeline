@@ -8,7 +8,7 @@ selects the correct OEP CSV and take number for each task.
 import logging
 from pathlib import Path
 import pandas as pd
-from pneumophonic_analysis import create_config
+from pneumophonic_analysis import create_config, select_subject_folders_gui
 from pneumophonic_analysis.paired_features import PairedFeatureExtractor
 
 logging.basicConfig(level=logging.INFO)
@@ -61,19 +61,12 @@ def select_from_list(items, label):
             return int(sel)
         print("Invalid selection. Try again.")
 
-def select_batch():
-    idx = select_from_list(BATCHES, "batches")
-    return BATCHES[idx]
-
-def select_subject(batch_name):
-    source_dir = DATA_ROOT / batch_name
-    subjects = sorted([
-        d for d in source_dir.iterdir()
-        if d.is_dir() and (d / "renders").exists()
-    ])
-    names = [s.name for s in subjects]
-    idx = select_from_list(names, f"subjects in {batch_name}")
-    return subjects[idx]
+def prompt_batch_label(default="healthy_subjects"):
+    """Ask for the output batch label that organises data_target/<label>/paired/."""
+    print("\nOutput batch label (organises data_target/<label>/paired/).")
+    print(f"  Suggestions: {', '.join(BATCHES)}")
+    label = input(f"  Batch label [{default}]: ").strip()
+    return label or default
 
 def load_timing(subject_folder, subject_id):
     """Load the Timing sheet from the subject's Excel file."""
@@ -137,8 +130,17 @@ def select_task(timing_df, subject_id, subject_folder):
     return task_label, audio_file, oep_csv, take_number, start, stop, falling_edge
 
 # ---- Run ----
-batch_name = select_batch()
-SUBJECT_FOLDER = select_subject(batch_name)
+print("A file browser will open — select ONE subject folder to extract.")
+_picked = select_subject_folders_gui(
+    title="Select a subject folder to extract",
+    initialdir=DATA_ROOT if DATA_ROOT.exists() else PROJECT_ROOT,
+    multiple=False,
+)
+if not _picked:
+    print("No folder selected — exiting.")
+    raise SystemExit(0)
+SUBJECT_FOLDER = _picked[0]
+batch_name = prompt_batch_label()
 
 subject_id = SUBJECT_FOLDER.name.split('_')[1] if '_' in SUBJECT_FOLDER.name else SUBJECT_FOLDER.name
 
@@ -151,8 +153,10 @@ task_label, audio_file, oep_csv, take_number, start_sec, stop_sec, falling_edge 
 )
 
 # ---- Config ----
+# data_root is informational only — the subject folder is passed explicitly to
+# the extractor; output_root controls where the .h5 is written.
 config = create_config(
-    data_root=DATA_ROOT / batch_name,
+    data_root=SUBJECT_FOLDER.parent,
     output_root=DATA_TARGET / batch_name
 )
 
