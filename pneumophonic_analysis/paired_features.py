@@ -508,6 +508,21 @@ class PairedFeatureExtractor:
         hop = self.config.audio.hop_length_samples
         audio_frame_times = np.arange(n_audio_frames) * hop / sr
 
+        # True raw-amplitude envelope on the audio frame grid — for intuitive
+        # visualization. The 'energy' feature is computed on the pre-emphasised
+        # + L2-normalised + denoised signal, which annihilates the steady
+        # low-frequency vowel and collapses sustained phonation to a single
+        # onset spike. rms_audio is the RMS of the *raw* segment and preserves
+        # the real loudness contour (so plots show a sustained vowel as sustained).
+        import librosa as _librosa
+        rms_audio = _librosa.feature.rms(
+            y=audio_segment, frame_length=hop * 2, hop_length=hop, center=True
+        )[0]
+        if len(rms_audio) >= n_audio_frames:
+            rms_audio = rms_audio[:n_audio_frames]
+        else:
+            rms_audio = np.pad(rms_audio, (0, n_audio_frames - len(rms_audio)), mode='edge')
+
         # ---- 6. OEP feature computation at native rate ----
         oep_segment = oep_segment.copy()
         oep_segment['time'] = np.arange(len(oep_segment)) / fs_oep
@@ -530,6 +545,29 @@ class PairedFeatureExtractor:
 
         # ---- 8. Build unified DataFrame ----
         df = self._build_dataframe(audio_feats, oep_interp, audio_frame_times)
+        df['rms_audio'] = rms_audio
+
+        # ---- 8b. Genuine FRC reference from quiet-breathing baseline ----
+        # FRC (functional residual capacity) = resting end-expiratory lung
+        # volume. We estimate it as the median of the expiratory troughs of the
+        # subject's baseline (quiet-breathing) recording, on the same absolute
+        # tot_vol scale as the phonation vcw. delta_vcw_frc = vcw - FRC then
+        # crosses zero at the *true* FRC level (vs. the within-phonation midpoint
+        # proxy used when no baseline reference is available).
+        frc_volume = float('nan')
+        try:
+            _bl = loader.load_oep_data(f"csv/{loader.subject_id}_baseline.csv")
+            _tv = _bl[oep_col_vcw].values.astype(float)
+            _bdt = float(np.median(np.diff(_bl['time'].values)))
+            _bfs = (1.0 / _bdt) if _bdt > 0 else fs_oep
+            from scipy.signal import find_peaks as _find_peaks
+            _troughs, _ = _find_peaks(-_tv, distance=max(1, int(2.0 * _bfs)))
+            frc_volume = (float(np.median(_tv[_troughs])) if len(_troughs) >= 3
+                          else float(np.percentile(_tv, 30)))
+        except Exception as _e:
+            logger.warning(f"  no baseline FRC reference ({_e}); delta_vcw_frc omitted")
+        if np.isfinite(frc_volume) and 'vcw' in df.columns:
+            df['delta_vcw_frc'] = df['vcw'] - frc_volume
 
         metadata = {
             'subject_id': loader.subject_id,
@@ -543,6 +581,7 @@ class PairedFeatureExtractor:
             'sync_time_offset_sec': sync_result.time_offset_sec,
             'calibration_k': calibration_k,
             'take_number': take_number,
+            'frc_volume': frc_volume,
         }
 
         paired = PairedFrame(

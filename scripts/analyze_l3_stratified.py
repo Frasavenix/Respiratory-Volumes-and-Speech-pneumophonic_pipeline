@@ -146,25 +146,59 @@ def find_frc_crossing_index(
     return int(cross_idx)
 
 
+def find_genuine_frc_crossing(delta_vcw_frc: np.ndarray) -> Optional[int]:
+    """
+    Genuine FRC crossing: the first index where the chest-wall volume descends
+    through the subject's *true* resting FRC level.
+
+    `delta_vcw_frc = vcw - frc_volume` (positive above FRC, negative below),
+    where frc_volume is the resting end-expiratory volume from the subject's
+    quiet-breathing baseline. The subject inhales above FRC then phonates down
+    through it, so we return the first positive→non-positive transition. Unlike
+    `find_frc_crossing_index` (which references the segment onset and falls back
+    to a midpoint), this is anchored to physiological FRC and returns None if
+    the phonation never actually crosses it.
+    """
+    x = np.asarray(delta_vcw_frc, dtype=float)
+    if len(x) < 2:
+        return None
+    sign = np.sign(x)
+    descending = (sign[:-1] > 0) & (sign[1:] <= 0)
+    crossings = np.where(descending)[0]
+    return int(crossings[0]) + 1 if len(crossings) > 0 else None
+
+
 def split_segment_at_frc(
     df: pd.DataFrame,
     min_frames_each_side: int = 20,   # ~0.30 s at 66 Hz, matches m2_correlation.py
-) -> Optional[Tuple[pd.DataFrame, pd.DataFrame]]:
+    prefer_genuine: bool = True,
+) -> Optional[Tuple[pd.DataFrame, pd.DataFrame, str]]:
     """
     Split a paired-feature DataFrame at the FRC crossing, returning the
-    above-FRC and below-FRC portions. Returns None if the split is not
-    valid (no crossing or too-short side).
+    above-FRC and below-FRC portions plus the method used ('genuine' or
+    'midpoint'). Returns None if the split is not valid (no crossing or
+    too-short side).
+
+    Prefers the *genuine* FRC crossing (vcw through the baseline resting volume,
+    via `delta_vcw_frc`) when that column is present and the phonation actually
+    crosses FRC; otherwise falls back to the onset-referenced midpoint proxy.
     """
-    if 'delta_vcw' not in df.columns:
-        return None
-    cross_idx = find_frc_crossing_index(df['delta_vcw'].values)
+    cross_idx, method = None, 'midpoint'
+    if prefer_genuine and 'delta_vcw_frc' in df.columns:
+        cross_idx = find_genuine_frc_crossing(df['delta_vcw_frc'].values)
+        method = 'genuine'
+    if cross_idx is None:
+        if 'delta_vcw' not in df.columns:
+            return None
+        cross_idx = find_frc_crossing_index(df['delta_vcw'].values)
+        method = 'midpoint'
     if cross_idx is None:
         return None
     above = df.iloc[:cross_idx]
     below = df.iloc[cross_idx:]
     if len(above) < min_frames_each_side or len(below) < min_frames_each_side:
         return None
-    return above, below
+    return above, below, method
 
 
 def compute_segment_features(
@@ -359,7 +393,7 @@ def collect_paired_segments(
             n_skipped_split += 1
             logger.debug(f"  Skipped (no valid FRC split): {subject_id}/{task}")
             continue
-        above, below = split
+        above, below, method = split
         feats = compute_segment_features(above, below)
         if feats is None:
             n_skipped_voiced += 1
@@ -370,6 +404,7 @@ def collect_paired_segments(
             'task': task,
             'n_above_frames': len(above),
             'n_below_frames': len(below),
+            'frc_method': method,
             'source_file': str(h5.name),
         })
         rows.append(feats)
@@ -383,6 +418,8 @@ def collect_paired_segments(
         raise RuntimeError(
             "No valid segments collected — check --paired-dir and --tasks"
         )
+    if 'frc_method' in seg_df.columns:
+        logger.info(f"  FRC crossing method: {seg_df['frc_method'].value_counts().to_dict()}")
 
     # Merge metadata
     merged = seg_df.merge(
