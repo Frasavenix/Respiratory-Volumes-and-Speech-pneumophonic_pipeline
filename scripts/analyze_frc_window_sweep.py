@@ -76,7 +76,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s | %(levelname)s | %(message)s')
 
-FRC_TASKS = ['a_2', 'a_3', 'a_7']
+FRC_TASKS = ['a_2', 'a_3']   # genuine sustained phonation; a_7 (A-GLIDE) excluded: pitch sweep is volitional, not respiratory
 FPS = 66.67                      # audio feature frame rate (hop 720 @ 48 kHz)
 WINDOW_SIZES_SEC = [0.015, 0.1, 0.25, 0.5, 1.0, 2.0]   # + 'whole-half'
 MIN_FRAMES_PER_WINDOW = 3        # don't average fewer than this

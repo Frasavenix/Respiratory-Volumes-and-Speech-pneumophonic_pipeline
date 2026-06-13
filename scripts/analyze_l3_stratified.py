@@ -73,9 +73,11 @@ logging.basicConfig(
 )
 
 
-# Tasks in which the FRC crossing is meaningful (sustained phonation only).
-# Matches Zocco's AB/BE analysis tasks and the existing L3.
-FRC_TASKS = ['a_2', 'a_3', 'a_7']
+# Tasks in which the FRC crossing is meaningful (genuine sustained phonation).
+# a_7 (A-GLIDE) excluded: it is a volitional pitch glissando, so its F0 shift across
+# FRC is driven by the deliberate sweep, not by respiration (it inflated the f0 effect).
+FRC_TASKS = ['a_2', 'a_3']
+GLIDE_TASKS = ['a_7']        # A-GLIDE glissando, analysed separately
 
 # Features compared above vs. below FRC. Matches the existing L3 pipeline.
 FEATURES = ['f0', 'energy', 'pct_rc', 'flow_cw']

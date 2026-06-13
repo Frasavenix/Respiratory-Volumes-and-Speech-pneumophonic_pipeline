@@ -46,7 +46,8 @@ from analyze_l3_stratified import load_metadata, assign_demographic_group
 
 ACOUSTIC = ['f0', 'energy', 'spectral_centroid']
 OEP = ['delta_vcw', 'flow_cw', 'pct_rc', 'pct_ab']
-SUSTAINED = ['a', 'e', 'i', 'o', 'u', 'a_2', 'a_3', 'a_7', 'r']
+SUSTAINED = ['a', 'e', 'i', 'o', 'u', 'a_2', 'a_3', 'r']   # a_7 (A-GLIDE) is a glissando, reported separately
+GLIDE = ['a_7']                                            # A-GLIDE: volitional pitch sweep
 SPEECH = ['f_1', 'f_2', 'f_3', 'f_4', 'f_5', 'testo']
 STRATA_ORDER = ['All', 'Male', 'Female', 'Young', 'Elder', 'YM', 'YF', 'EM', 'EF']
 MIN_FRAMES = 15
@@ -138,8 +139,8 @@ def main():
             out.append(dict(stratum=stratum, pair=pair, task=task,
                             mean_r=a['mean_r'], sign_consistency=a['sign_consistency'],
                             n=int(a['n'])))
-        # sustained / speech scope aggregates
-        for scope, tasks in [('SUSTAINED', SUSTAINED), ('SPEECH', SPEECH)]:
+        # sustained / glide / speech scope aggregates
+        for scope, tasks in [('SUSTAINED', SUSTAINED), ('GLIDE', GLIDE), ('SPEECH', SPEECH)]:
             ss = sub[sub['task'].isin(tasks)]
             for pair, g in ss.groupby('pair'):
                 a = agg(g)
@@ -194,7 +195,7 @@ def main():
         plt.close(fig)
 
     # ---- ranked shortlist: strong + consistent couplings ----
-    cand = S[(S['n'] >= 6) & (S['task'].isin(SUSTAINED + ['SUSTAINED']))].copy()
+    cand = S[(S['n'] >= 6) & (S['task'].isin(SUSTAINED + GLIDE + ['SUSTAINED', 'GLIDE']))].copy()
     cand['score'] = cand['mean_r'].abs() * cand['sign_consistency']
     top = cand.sort_values('score', ascending=False).head(30)
     top.to_csv(args.output_dir / 'top_consistent_couplings.csv', index=False)

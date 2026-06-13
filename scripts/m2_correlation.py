@@ -60,7 +60,8 @@ def select_batch():
         print("Invalid selection. Try again.")
 
 # ---- Task categories ----
-SUSTAINED_TASKS = {'a', 'a_2', 'a_3', 'a_7', 'r'}
+SUSTAINED_TASKS = {'a', 'a_2', 'a_3', 'r'}   # a_7 (A-GLIDE) is a glissando, not sustained
+GLIDE_TASKS = {'a_7'}                        # A-GLIDE: volitional pitch sweep, analysed separately
 SPEECH_TASKS = {'f_1', 'f_2', 'f_3', 'f_4', 'f_5', 'testo'}
 VOWEL_TASKS = {'a', 'e', 'i', 'o', 'u'}
 
@@ -379,7 +380,7 @@ def run_frc_analysis(paired_dir, output_dir):
     print("LEVEL 3: Event-aligned FRC analysis")
     print("="*60)
 
-    frc_tasks = {'a_2', 'a_3', 'a_7'}
+    frc_tasks = {'a_2', 'a_3'}   # a_7 (A-GLIDE) excluded: volitional pitch sweep, not respiratory
     h5_files = sorted(paired_dir.glob("*.h5"))
     frc_results = []
 

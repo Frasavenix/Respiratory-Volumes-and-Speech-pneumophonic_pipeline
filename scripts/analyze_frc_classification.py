@@ -84,7 +84,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s | %(levelname)s | %(message)s')
 
-FRC_TASKS = ['a_2', 'a_3', 'a_7']
+FRC_TASKS = ['a_2', 'a_3']   # genuine sustained phonation; a_7 (A-GLIDE) excluded: pitch sweep is volitional, not respiratory
 MIN_FRAMES_PER_CLASS = 20     # min above-FRC and below-FRC voiced frames / recording
 
 
