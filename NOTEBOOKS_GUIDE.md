@@ -112,8 +112,9 @@ The picker is implemented in `pneumophonic_analysis.io_utils.select_subject_fold
 | 05 | [M3_compartmental_regression](notebooks/05_M3_compartmental_regression.ipynb) | `analyze_compartmental_regression.py`, `diagnose_compartmental_signal.py` | real | 6 |
 | 06 | [M3_frc_classification](notebooks/06_M3_frc_classification.ipynb) | `analyze_frc_classification.py`, `analyze_frc_window_sweep.py` | real | 4 |
 | 07 | [acoustic_features_and_tasks](notebooks/07_acoustic_features_and_tasks.ipynb) | `acoustic_features.py`, `segmentation.py`, `task_analyzers.py`, `visualization.py`, `analyze_single_subject.py`, `analyze_trill_modulation.py` | synthetic | 11 |
-| 08 | [singer_acoustic_features](notebooks/08_singer_acoustic_features.ipynb) | `singer_acoustc_features.py` (+ `operatic_acoustic_analysis.ipynb`) | synthetic | 9 |
-| 09 | [diagnostics_and_inspection](notebooks/09_diagnostics_and_inspection.ipynb) | `tools.py`, `count_check.py`, `tool_h5_id_match.py` | real | 4 |
+| 08 | [M3_multivariate_coupling](notebooks/08_M3_multivariate_coupling.ipynb) | `analyze_multivariate_coupling.py` (CCA, PLS) | real | 3 |
+| 09 | [singer_acoustic_features](notebooks/09_singer_acoustic_features.ipynb) | `singer_acoustc_features.py` (+ `operatic_acoustic_analysis.ipynb`) | synthetic | 9 |
+| 10 | [diagnostics_and_inspection](notebooks/10_diagnostics_and_inspection.ipynb) | `tools.py`, `count_check.py`, `tool_h5_id_match.py` | real | 4 |
 
 There is also the pre-existing [`notebooks/operatic_acoustic_analysis.ipynb`](notebooks/operatic_acoustic_analysis.ipynb)
 — the **real-data** operatic study; it requires singer recordings under
@@ -172,13 +173,20 @@ audio+sync, spectrogram, mel, F0 trace, OEP volume+FRC, FRC segment, glide novel
 result, metrics bar), `PraatAnalyzer` clinical metrics (jitter/shimmer/HNR/DSI/formants),
 `FRCSegmenter`/`GlideSegmenter`/`ModulationAnalyzer`, and the trill modulation spectrum.
 
-### 08 — Singer-specific acoustic features
+### 08 — Multivariate audio↔OEP coupling (CCA + PLS)
+Beyond pairwise correlation: stratified CCA (symmetric audio↔OEP) and PLS (audio→%RC) on
+within-subject z-scored voiced frames from sustained phonation (glissando `a_7` excluded),
+cross-validated by subject. The coupling is real but low-dimensional (first canonical
+correlation ≈ 0.39), carried by spectral level (MFCC-0, energy) rather than pitch; audio→%RC
+is weakly predictive (CV R² ≈ 0.06 to 0.10).
+
+### 09 — Singer-specific acoustic features
 The operatic extension (`singer_acoustc_features.py`): vibrato (rate/extent/regularity), singer's-formant
 cluster ratio, LTAS slope, formant-band HNR, F1/F2 vowel space, MFCC fingerprint, mel+F0, and the
 *voce girata* vs *non-girata* contrast — on a synthetic cohort engineered to show the expected
 differences.
 
-### 09 — Diagnostics & inspection
+### 10 — Diagnostics & inspection
 Cohort age distribution by sex, extraction-coverage heatmap (subject × task), per-task recording
 counts, HDF5 inspection, and the ΔVcw FRC-crossing diagnostic that validates the L3/M3 splitter.
 
@@ -196,12 +204,13 @@ counts, HDF5 inspection, and the ΔVcw FRC-crossing diagnostic that validates th
 | `scripts/analyze_frc_classification.py`, `scripts/analyze_frc_window_sweep.py` | 06 |
 | `scripts/analyze_single_subject.py`, `scripts/analyze_trill_modulation.py` | 07 |
 | `scripts/analyze_batch.py`, `pipeline.py` (`run_pipeline`) | 07 (metrics bar) + 00 |
-| `scripts/tools.py`, `count_check.py`, `tool_h5_id_match.py` | 09 |
+| `scripts/analyze_multivariate_coupling.py` | 08 |
+| `scripts/tools.py`, `count_check.py`, `tool_h5_id_match.py` | 10 |
 | `MAIN_UX.py` (control center) | one menu that launches every script below |
 
 Core modules `config`, `io_utils`, `sync`, `audio_processing`, `acoustic_features`, `segmentation`,
 `task_analyzers`, `paired_features`, `visualization`, `effect_size`, `singer_acoustc_features` are all
-imported and exercised across the notebooks (notably 00, 01, 02, 07, 08).
+imported and exercised across the notebooks (notably 00, 01, 02, 07, 09).
 
 ---
 
@@ -265,11 +274,14 @@ One example of each is embedded in the notebook(s) listed.
 | LTAS slope strip plot | 08 |
 | Formant-band HNR boxplot | 08 |
 | F1/F2 vowel-space scatter (inverted axes) | 08 |
-| Girata vs non-girata comparison bars | 08 |
-| Cohort age histogram by sex | 09 |
-| Extraction-coverage heatmap (subject × task) | 09 |
-| Per-task recording-count bar | 09 |
-| ΔVcw FRC-crossing diagnostic traces | 09 |
+| CCA canonical-correlation bars (audio↔OEP) | 08 |
+| Audio-feature loading heatmap (canonical variate) | 08 |
+| PLS audio→%RC CV-R² bars | 08 |
+| Girata vs non-girata comparison bars | 09 |
+| Cohort age histogram by sex | 10 |
+| Extraction-coverage heatmap (subject × task) | 10 |
+| Per-task recording-count bar | 10 |
+| ΔVcw FRC-crossing diagnostic traces | 10 |
 
 ---
 
