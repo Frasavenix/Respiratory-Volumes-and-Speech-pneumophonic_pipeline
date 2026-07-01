@@ -9,6 +9,8 @@ This pipeline builds on the Master's thesis:
 > **"Integrated Analysis of Respiratory-Phonatory Functions: Normative Patterns Across Sex and Age"**
 > Bianca Zocco, Politecnico di Milano, 2024-2025
 
+In order to run the scripts, Zocco's Dataset is needed.
+
 The current work extends the original analysis toward **respiratory-acoustic correlation modeling**: extracting time-aligned paired features from OEP and audio signals, computing cross-domain correlations, and preparing the ground for predictive models (audio-to-respiratory and respiratory-to-audio).
 
 ## Pipeline Overview
@@ -19,9 +21,6 @@ The pipeline operates in milestones:
 |-----------|--------|-------------|
 | **M1** | Done | Paired feature extraction (time-aligned audio + OEP matrices) |
 | **M2** | Done | Exploratory correlation analysis (global, time-resolved, FRC-aligned) |
-| **M3** | Planned | Baseline regression models (audio to respiratory) |
-| **M4** | Planned | Sequence models (LSTM / 1D-CNN) |
-| **M5** | Planned | Compartmental body mapping from audio |
 
 ## Installation
 
