@@ -180,13 +180,7 @@ cross-validated by subject. The coupling is real but low-dimensional (first cano
 correlation ≈ 0.39), carried by spectral level (MFCC-0, energy) rather than pitch; audio→%RC
 is weakly predictive (CV R² ≈ 0.06 to 0.10).
 
-### 09 — Singer-specific acoustic features
-The operatic extension (`singer_acoustc_features.py`): vibrato (rate/extent/regularity), singer's-formant
-cluster ratio, LTAS slope, formant-band HNR, F1/F2 vowel space, MFCC fingerprint, mel+F0, and the
-*voce girata* vs *non-girata* contrast — on a synthetic cohort engineered to show the expected
-differences.
-
-### 10 — Diagnostics & inspection
+### 09 — Diagnostics & inspection
 Cohort age distribution by sex, extraction-coverage heatmap (subject × task), per-task recording
 counts, HDF5 inspection, and the ΔVcw FRC-crossing diagnostic that validates the L3/M3 splitter.
 
